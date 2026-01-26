@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import json
@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from .engine import load_kernels, utc_to_et, et_to_utc, get_apparent_target_radec, vector_to_radec
 from .sim import get_sim, Spacecraft
 from .models import StateVector, Vector3, BurnCommand, StarData
+from .auth import get_current_user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,7 +17,7 @@ async def lifespan(app: FastAPI):
     yield
     # Clean up if needed
 
-app = FastAPI(title="Astrogator API", version="0.2.1", lifespan=lifespan)
+app = FastAPI(title="Astrogator API", version="0.2.2", lifespan=lifespan)
 
 # CORS Configuration
 origins = [
@@ -52,13 +53,16 @@ async def get_stars():
     return STARS_DB
 
 @app.get("/api/nav/state/{sc_id}")
-async def get_nav_state(sc_id: str):
+async def get_nav_state(sc_id: str, user_id: str = Depends(get_current_user)):
     """
     Get the spacecraft's current "Sensor" state: Time and Starfield.
     In a real blind scenario, we wouldn't return position/velocity here,
     but for the UI instrument panel, we might want to return them 'hidden' or 
     just return the observables.
     """
+    if user_id != sc_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this spacecraft")
+
     sc = get_sim().get_spacecraft(sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Spacecraft not found")
@@ -99,7 +103,10 @@ async def get_nav_state(sc_id: str):
     }
 
 @app.post("/api/cmd/burn/{sc_id}")
-async def execute_burn(sc_id: str, command: BurnCommand):
+async def execute_burn(sc_id: str, command: BurnCommand, user_id: str = Depends(get_current_user)):
+    if user_id != sc_id:
+        raise HTTPException(status_code=403, detail="Not authorized to control this spacecraft")
+        
     sc = get_sim().get_spacecraft(sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Spacecraft not found")

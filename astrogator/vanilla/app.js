@@ -1,10 +1,16 @@
 const API_BASE = 'http://localhost:8000';
-const SC_ID = 'student1';
+// const SC_ID = 'student1'; // Removed: Dynamic based on login
 
 // State
 let currentState = null;
 let starCatalog = []; // Local cache
 let pollingInterval = null;
+
+// Auth State
+let auth = {
+  id: localStorage.getItem('astro_id') || null,
+  token: localStorage.getItem('astro_token') || null
+};
 
 // Camera State
 let cam = {
@@ -60,6 +66,10 @@ function init() {
   document.getElementById('btn-close-help').addEventListener('click', () => toggleModal(false));
   document.getElementById('btn-ack-help').addEventListener('click', () => toggleModal(false));
 
+  // Login Listener
+  document.getElementById('btn-login').addEventListener('click', handleLogin);
+  document.getElementById('btn-logout').addEventListener('click', logout);
+
   // Tab Listeners
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -81,12 +91,67 @@ function init() {
   });
   els.canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
 
-  // Boot sequence: Fetch Stars -> THEN Fetch Initial State
+  // Boot sequence
+  if (auth.id && auth.token) {
+    // Authenticated -> Load
+    startApp();
+  } else {
+    // Show Login
+    document.getElementById('login-modal').classList.remove('hidden');
+    document.getElementById('login-modal').style.display = 'flex';
+  }
+}
+
+function startApp() {
+  document.getElementById('login-modal').classList.add('hidden');
+  document.getElementById('login-modal').style.display = 'none';
+
+  // Update header
+  document.querySelector('.version').innerText = `v0.2.1 [${auth.id}]`;
+
   fetchStars().then(() => {
     fetchData();
     // Poll every 60s
+    if (pollingInterval) clearInterval(pollingInterval);
     pollingInterval = setInterval(fetchData, 60000);
   });
+}
+
+async function handleLogin() {
+  const id = document.getElementById('login-id').value;
+  const token = document.getElementById('login-token').value;
+  const errEl = document.getElementById('login-error');
+
+  if (!id || !token) {
+    errEl.innerText = "Please enter both ID and Token";
+    errEl.style.display = 'block';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  // Verify by making a request
+  try {
+    const res = await fetch(`${API_BASE}/api/nav/state/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (res.ok) {
+      // Success
+      auth.id = id;
+      auth.token = token;
+      localStorage.setItem('astro_id', id);
+      localStorage.setItem('astro_token', token);
+      errEl.classList.add('hidden');
+      errEl.style.display = 'none';
+      startApp();
+    } else {
+      throw new Error("Auth Failed");
+    }
+  } catch (e) {
+    errEl.innerText = "Authentication Failed: Invalid ID or Token";
+    errEl.style.display = 'block';
+    errEl.classList.remove('hidden');
+  }
 }
 
 function resizeCanvas() {
@@ -117,8 +182,21 @@ async function fetchStars() {
 
 
 async function fetchData() {
+  if (!auth.id) return;
+
   try {
-    const res = await fetch(`${API_BASE}/api/nav/state/${SC_ID}`);
+    const res = await fetch(`${API_BASE}/api/nav/state/${auth.id}`, {
+      headers: {
+        'Authorization': `Bearer ${auth.token}`
+      }
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      // Auth error, logout
+      logout();
+      return;
+    }
+
     if (!res.ok) throw new Error('API Error');
     const data = await res.json();
 
@@ -128,6 +206,18 @@ async function fetchData() {
     console.error("Fetch failed", e);
     els.timeDisplay.innerText = "CONN. ERROR";
   }
+}
+
+function logout() {
+  auth.id = null;
+  auth.token = null;
+  localStorage.removeItem('astro_id');
+  localStorage.removeItem('astro_token');
+
+  if (pollingInterval) clearInterval(pollingInterval);
+
+  document.getElementById('login-modal').classList.remove('hidden');
+  document.getElementById('login-modal').style.display = 'flex';
 }
 
 /* async function handleBurn() {

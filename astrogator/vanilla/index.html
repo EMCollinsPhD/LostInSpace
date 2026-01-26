@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Astrogator v0.2.1</title>
+    <title>Astrogator v0.2.2</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -15,11 +15,15 @@
         <header>
             <div class="header-top">
                 <div class="title-group">
-                    <h1 class="text-green-500">ASTROGATOR <span class="version">v0.2.1</span></h1>
+                    <h1 class="text-green-500">ASTROGATOR <span class="version">v0.2.2</span></h1>
                 </div>
                 <div class="status-group">
-                    <button id="btn-help" class="btn btn-blue"><i data-lucide="help-circle"></i> HELP</button>
-                    <button id="btn-refresh" class="btn btn-green">REFRESH DATA</button>
+                    <div class="flex gap-2">
+                        <button id="btn-help" class="btn-icon" title="Help"><i data-lucide="help-circle"></i></button>
+                        <button id="btn-refresh" class="btn-icon" title="Refresh Data"><i
+                                data-lucide="refresh-cw"></i></button>
+                        <button id="btn-logout" class="btn-icon" title="Logout"><i data-lucide="log-out"></i></button>
+                    </div>
                     <div class="badge">JD-UTC: <span id="display-time">--</span></div>
                     <div class="badge">FUEL: <span id="display-fuel">--</span> m/s</div>
                 </div>
@@ -95,6 +99,34 @@
             </div>
             <div class="modal-footer">
                 <button id="btn-ack-help" class="btn btn-green-outline">ACKNOWLEDGE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>IDENTIFICATION REQUIRED</h2>
+            </div>
+            <div class="modal-body">
+                <p class="mb-4 text-sm text-slate-400">Please enter your spacecraft credentials to access the Astrogator
+                    GNC system.</p>
+
+                <div class="login-grid">
+                    <label for="login-id" class="text-right uppercase text-slate-500 text-xs font-bold pt-2">Spacecraft
+                        ID</label>
+                    <input type="text" id="login-id" class="input-dark font-mono" placeholder="e.g. student1">
+
+                    <label for="login-token" class="text-right uppercase text-slate-500 text-xs font-bold pt-2">Access
+                        Token</label>
+                    <input type="password" id="login-token" class="input-dark font-mono" placeholder="••••••••••••">
+                </div>
+
+                <div id="login-error" class="hidden text-red-500 text-xs text-center mt-4">Authentication Failed</div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-login" class="btn btn-green w-full">AUTHENTICATE</button>
             </div>
         </div>
     </div>

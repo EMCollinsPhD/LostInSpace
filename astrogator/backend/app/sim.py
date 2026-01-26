@@ -60,6 +60,11 @@ class Simulation:
             np.array([1.496e8, 1000.0, 0.0, 0.0, 29.78, 0.0]), 
             start_et
         )
+        self.spacecrafts["emc2"] = Spacecraft(
+            "emc2", 
+            np.array([1.496e8 + 5000, 1000.0 + 5000, 0.0, 0.0, 29.78, 0.0]), 
+            start_et
+        )
 
     def get_spacecraft(self, sc_id: str) -> Spacecraft:
         # Auto-update to current time on access?
