@@ -5,7 +5,10 @@ import json
 import os
 from contextlib import asynccontextmanager
 
-from .engine import load_kernels, utc_to_et, et_to_utc, get_apparent_target_radec, vector_to_radec
+from .engine import (
+    load_kernels, utc_to_et, et_to_utc, get_apparent_target_radec, vector_to_radec,
+    get_body_position, get_orbit_path
+)
 from .sim import get_sim, Spacecraft
 from .models import StateVector, Vector3, BurnCommand, StarData
 from .auth import get_current_user
@@ -17,7 +20,7 @@ async def lifespan(app: FastAPI):
     yield
     # Clean up if needed
 
-app = FastAPI(title="Astrogator API", version="0.2.2", lifespan=lifespan)
+app = FastAPI(title="Astrogator API", version="0.2.3", lifespan=lifespan)
 
 # CORS Configuration
 origins = [
@@ -51,6 +54,47 @@ async def root():
 async def get_stars():
     """Return the static star catalog."""
     return STARS_DB
+
+@app.get("/api/nav/orrery/live")
+async def get_orrery_live():
+    """Return current positions of solar system bodies."""
+    # Use current sim time (or real time if sim not persistent)
+    # Ideally should use sim time.
+    sim = get_sim()
+    # We can use the first spacecraft's time as the "Sim Time"
+    # or just use real time for the Overview if it's meant to be "Now".
+    # Let's use 'emc2' or 'student1' time if available, else real time.
+    
+    # For now, just grab student1 time
+    sc = sim.get_spacecraft("student1")
+    et = sc.et if sc else utc_to_et("2026-01-01T00:00:00")
+    
+    bodies = ["MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN"]
+    data = {}
+    for b in bodies:
+        data[b] = get_body_position(b, et)
+        
+    return {
+        "et": et,
+        "utc": et_to_utc(et),
+        "bodies": data
+    }
+
+@app.get("/api/nav/orrery/static")
+async def get_orrery_static():
+    """Return orbital paths for solar system bodies (Initial Load)."""
+    # Use roughly current time to generate the ellipse
+    sim = get_sim()
+    sc = sim.get_spacecraft("student1")
+    et = sc.et if sc else utc_to_et("2026-01-01T00:00:00")
+    
+    bodies = ["MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN"]
+    paths = {}
+    for b in bodies:
+        # Generate 120 points for smoothness
+        paths[b] = get_orbit_path(b, et, num_points=120)
+        
+    return paths
 
 @app.get("/api/nav/state/{sc_id}")
 async def get_nav_state(sc_id: str, user_id: str = Depends(get_current_user)):

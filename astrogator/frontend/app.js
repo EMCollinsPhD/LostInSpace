@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:8000';
+import { API_BASE } from './config.js';
+import { initOrrery, triggerResize } from './orrery.js';
 // const SC_ID = 'student1'; // Removed: Dynamic based on login
 
 // State
@@ -45,6 +46,7 @@ const els = {
   camFov: document.getElementById('display-fov'),
   camRa: document.getElementById('display-ra'),
   camDec: document.getElementById('display-dec'),
+  camTarget: document.getElementById('display-target'),
   /* inputs: {
     x: document.getElementById('input-dv-x'),
     y: document.getElementById('input-dv-y'),
@@ -334,21 +336,27 @@ function renderTracker(data) {
     };
   }
 
-  // Draw Stars
-  // Optimization: Stars are many (~9000). 
-  // We can pre-calculate colors or do it on fly. 
-  // Given 60fps target, keep it simple first.
+  // Draw Stars (with reticle logic)
+  let closestDist = Infinity;
+  let closestName = "--";
 
   starCatalog.forEach(star => {
     // Simple cull before projection if possible? 
-    // No, need projection to know if in FOV easily without complex 3D math here.
     const p = project(star.ra, star.dec);
     if (p) {
       if (p.x < -2 || p.x > w + 2 || p.y < -2 || p.y > h + 2) return;
 
+      // Targeting
+      const dx = p.x - (w / 2);
+      const dy = p.y - (h / 2);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < 15 && dist < closestDist) {
+        closestDist = dist;
+        closestName = "STAR " + (star.id || "");
+      }
+
       // Magnitude scaling based on phys.
-      // E.g. area ~ flux ~ 10^(-0.4 * mag)
-      // Visual tweak:
       let r = 0;
       let alpha = 1.0;
 
@@ -365,7 +373,6 @@ function renderTracker(data) {
       if (r < 0.6) r = 0.6; // Minimum visible pixel size
 
       // Color from B-V Index
-      // Rough approximation
       let fill = '#ffffff';
       if (typeof star.bv === 'number') {
         if (star.bv < 0.0) fill = '#9bb0ff';      // Blue-white
@@ -399,11 +406,24 @@ function renderTracker(data) {
       ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
       ctx.fill();
 
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '10px monospace';
-      ctx.fillText(body.name, p.x + r + 4, p.y + 3);
+      // Targeting Logic
+      const dx = p.x - (w / 2);
+      const dy = p.y - (h / 2);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Priority to planets over stars? 
+      // Let's say if within 20px, we select it.
+      if (dist < 20 && dist < closestDist) {
+        closestDist = dist;
+        closestName = body.name;
+      }
     }
   });
+
+  // Update Target Display
+  if (els.camTarget) {
+    els.camTarget.innerText = closestName;
+    els.camTarget.className = (closestName !== "--") ? "text-cyan-500 font-bold" : "text-slate-500";
+  }
 
   // Draw Crosshairs
   ctx.strokeStyle = '#22c55e'; // green-500
@@ -453,7 +473,6 @@ window.onload = init;
 function switchTab(tabId) {
   // Hide all contents
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   // Deactivate buttons
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
 
@@ -461,6 +480,18 @@ function switchTab(tabId) {
   document.getElementById(tabId).classList.remove('hidden');
   document.getElementById(tabId).classList.add('active');
   document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+
+  // Orrery Logic
+  if (tabId === 'tab-overview') {
+    if (!window.orreryInitialized) {
+      initOrrery('orrery-container');
+      window.orreryInitialized = true;
+    }
+    // Give the browser a moment to layout the div before resizing
+    requestAnimationFrame(() => {
+      triggerResize();
+    });
+  }
 
   // Resize canvas if needed when becoming visible
   if (tabId === 'tab-tracker') resizeCanvas();

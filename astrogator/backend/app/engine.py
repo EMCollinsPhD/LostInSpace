@@ -105,5 +105,75 @@ def get_apparent_target_radec(target: str, observer_pos_j2k: np.ndarray, et: flo
         
         return vector_to_radec(obs_to_target)
     except Exception as e:
+        return vector_to_radec(obs_to_target)
+    except Exception as e:
         print(f"Error getting apparent RA/DEC for {target} (using {target_lookup}): {e}")
         return 0, 0, 0
+
+# Orbital Periods in days (Approx)
+ORBITAL_PERIODS = {
+    "MERCURY": 88.0,
+    "VENUS": 224.7,
+    "EARTH": 365.2,
+    "MARS": 687.0,
+    "JUPITER": 4331.0,
+    "SATURN": 10747.0
+}
+
+def get_body_position(target: str, et: float) -> List[float]:
+    """Get [x,y,z] position of target relative to SUN in J2000 frame (km)."""
+    # Define fallback map inside or access from scope if available.
+    # Duplicating here or moving it to module level is better.
+    # Moving FALLBACK_MAP to module level is cleaner but triggers larger diff.
+    # Let's just define it here for minimal disruption or use the one if I move it.
+    
+    # Let's check `get_apparent_target_radec`'s map. It's inside that function.
+    # I'll define a module-level constant for it to avoid duplication.
+    
+    FALLBACK_MAP = {
+        "MARS": "4",
+        "JUPITER": "5",
+        "SATURN": "6",
+        "URANUS": "7",
+        "NEPTUNE": "8",
+        "PLUTO": "9"
+    }
+    
+    target_lookup = FALLBACK_MAP.get(target.upper(), target)
+
+    try:
+        # 4 = Mars, 5 = Jupiter etc.
+        # Fallback map if needed, identical to get_apparent_target_radec logic
+        # But commonly SPICE handles strings if kernels are loaded.
+        # User requested Ecliptic Plane (Reference X-axis = Vernal Equinox). "ECLIPJ2000" is exactly that.
+        state, _ = spice.spkezr(target_lookup, et, "ECLIPJ2000", "NONE", "SUN")
+        return list(state[:3])
+    except Exception as e:
+        print(f"SPICE Error pos {target} (using {target_lookup}): {e}")
+        return [0.0, 0.0, 0.0]
+
+def get_orbit_path(target: str, center_et: float, num_points: int = 180) -> List[List[float]]:
+    """
+    Generate a list of 3D points representing the orbit of the target body.
+    Samples one full orbital period centered around center_et.
+    """
+    period_days = ORBITAL_PERIODS.get(target.upper(), 365.0)
+    period_sec = period_days * 24 * 3600
+    
+    # Start half a period ago to ensure we cover the loop? 
+    # Actually, usually just start at current time and go forward one period 
+    # to draw the "future" orbit, or center it.
+    # Let's start at current time minus nearly a full period to show the "track" 
+    # but for a closed loop it doesn't matter where we start.
+    
+    start_et = center_et
+    points = []
+    
+    step = period_sec / num_points
+    
+    for i in range(num_points + 1): # +1 to close the loop effectively
+        t = start_et + (i * step)
+        pos = get_body_position(target, t)
+        points.append(pos)
+        
+    return points
