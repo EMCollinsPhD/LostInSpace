@@ -1,0 +1,129 @@
+from fastapi import FastAPI, HTTPException, Body
+from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
+import json
+import os
+from contextlib import asynccontextmanager
+
+from .engine import load_kernels, utc_to_et, et_to_utc, get_apparent_target_radec, vector_to_radec
+from .sim import get_sim, Spacecraft
+from .models import StateVector, Vector3, BurnCommand, StarData
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load SPICE kernels on startup
+    load_kernels()
+    yield
+    # Clean up if needed
+
+app = FastAPI(title="Astrogator API", version="0.2.1", lifespan=lifespan)
+
+# CORS Configuration
+origins = [
+    "http://localhost:5173",    # Vite default
+    "http://127.0.0.1:5173",    # For local dev testing
+    "http://173.235.214.113:5173" # Static IP when deployed
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Load Stars
+STARS_FILE = os.path.join(os.path.dirname(__file__), "data", "stars.json")
+try:
+    with open(STARS_FILE, "r") as f:
+        STARS_DB = json.load(f)
+except Exception as e:
+    print(f"Warning: Could not load stars.json: {e}")
+    STARS_DB = []
+
+@app.get("/")
+async def root():
+    return {"message": "Astrogator GNC Online"}
+
+@app.get("/api/nav/stars")
+async def get_stars():
+    """Return the static star catalog."""
+    return STARS_DB
+
+@app.get("/api/nav/state/{sc_id}")
+async def get_nav_state(sc_id: str):
+    """
+    Get the spacecraft's current "Sensor" state: Time and Starfield.
+    In a real blind scenario, we wouldn't return position/velocity here,
+    but for the UI instrument panel, we might want to return them 'hidden' or 
+    just return the observables.
+    """
+    sc = get_sim().get_spacecraft(sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Spacecraft not found")
+    
+    # Construct observable data
+    et = sc.et
+    utc = et_to_utc(et)
+    
+    # Calculate visible bodies (Planets + Sun)
+    # We treat the spacecraft position as relative to SUN for these calcs
+    bodies = ["SUN", "EARTH", "MARS", "JUPITER", "VENUS"]
+    visible_bodies = []
+    
+    for body in bodies:
+        r, ra, dec = get_apparent_target_radec(body, sc.state[:3], et)
+        visible_bodies.append({
+            "name": body,
+            "ra": ra,
+            "dec": dec,
+            "mag": -1.0 # Placeholder
+        })
+        
+    # Calculate stars (treated as infinite distance, so RA/DEC is constant J2000 catalog value?)
+    # Proper motion is negligible for this. Parallax negligible.
+    # So we just return the catalog stars. Their apparent RA/DEC is their catalog RA/DEC.
+    # We assume 'J2000' frame for the instrument panel.
+    
+    return {
+        "time": {
+            "et": et,
+            "utc": utc
+        },
+        "observables": {
+            "bodies": visible_bodies,
+            # "stars": STARS_DB # Moved to /api/nav/stars
+        },
+        "fuel": sc.fuel
+    }
+
+@app.post("/api/cmd/burn/{sc_id}")
+async def execute_burn(sc_id: str, command: BurnCommand):
+    sc = get_sim().get_spacecraft(sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Spacecraft not found")
+    
+    # In a real sim, we'd propagate to command.utc_time first.
+    # For now, apply immediately or propagate sim to that time?
+    # Let's assume immediate applied at current sim time for MVP simplification
+    # unless command.utc_time is in future.
+    
+    dv = np.array([command.delta_v.x, command.delta_v.y, command.delta_v.z])
+    sc.apply_burn(dv)
+    
+    return {"status": "Burn executed", "remaining_fuel": sc.fuel}
+
+@app.get("/api/admin/truth/{sc_id}")
+async def get_truth_state(sc_id: str):
+    """Debug endpoint to see actual state."""
+    sc = get_sim().get_spacecraft(sc_id)
+    if not sc:
+        raise HTTPException(status_code=404, detail="Spacecraft not found")
+        
+    return {
+        "id": sc.id,
+        "state": sc.state.tolist(), # [x, y, z, vx, vy, vz]
+        "et": sc.et,
+        "utc": et_to_utc(sc.et)
+    }

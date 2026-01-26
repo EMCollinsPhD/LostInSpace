@@ -1,0 +1,377 @@
+const API_BASE = 'http://localhost:8000';
+const SC_ID = 'student1';
+
+// State
+let currentState = null;
+let starCatalog = []; // Local cache
+let pollingInterval = null;
+
+// Camera State
+let cam = {
+  ra: 0,   // Center RA (deg)
+  dec: 0,  // Center DEC (deg)
+  fov: 60, // Field of View (deg)
+  dragging: false,
+  lastX: 0,
+  lastY: 0
+};
+
+// Config
+const PLANET_COLORS = {
+  'SUN': 'yellow',
+  'MERCURY': '#a1a1aa', // gray-400
+  'VENUS': '#fde047', // yellow-300
+  'EARTH': '#3b82f6', // blue-500
+  'MARS': '#ef4444', // red-500
+  'JUPITER': '#d97706', // amber-600 (tan)
+  'SATURN': '#eab308', // yellow-500
+  'URANUS': '#22d3ee', // cyan-400
+  'NEPTUNE': '#3b82f6', // blue-500
+  'PLUTO': '#94a3b8'  // slate-400
+};
+
+// DOM Elements
+const els = {
+  canvas: document.getElementById('star-tracker'),
+  overlay: document.getElementById('tracker-overlay'),
+  timeDisplay: document.getElementById('display-time'),
+  fuelDisplay: document.getElementById('display-fuel'),
+  camFov: document.getElementById('display-fov'),
+  camRa: document.getElementById('display-ra'),
+  camDec: document.getElementById('display-dec'),
+  /* inputs: {
+    x: document.getElementById('input-dv-x'),
+    y: document.getElementById('input-dv-y'),
+    z: document.getElementById('input-dv-z'),
+  }, */
+  // statusMsg: document.getElementById('status-msg'),
+  modal: document.getElementById('help-modal'),
+};
+
+// --- Initialization ---
+function init() {
+  // Canvas Sizing
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // Event Listeners
+  document.getElementById('btn-refresh').addEventListener('click', fetchData);
+  document.getElementById('btn-help').addEventListener('click', () => toggleModal(true));
+  document.getElementById('btn-close-help').addEventListener('click', () => toggleModal(false));
+  document.getElementById('btn-ack-help').addEventListener('click', () => toggleModal(false));
+
+  // Tab Listeners
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchTab(btn.dataset.tab);
+    });
+  });
+
+  // Canvas Interaction
+  els.canvas.addEventListener('mousemove', handleCanvasMouseMove);
+  els.canvas.addEventListener('mousedown', (e) => {
+    cam.dragging = true;
+    cam.lastX = e.clientX;
+    cam.lastY = e.clientY;
+    els.canvas.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mouseup', () => {
+    cam.dragging = false;
+    els.canvas.style.cursor = 'crosshair';
+  });
+  els.canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
+
+  // Boot sequence: Fetch Stars -> THEN Fetch Initial State
+  fetchStars().then(() => {
+    fetchData();
+    // Poll every 60s
+    pollingInterval = setInterval(fetchData, 60000);
+  });
+}
+
+function resizeCanvas() {
+  const parent = els.canvas.parentElement;
+  els.canvas.width = parent.clientWidth;
+  els.canvas.height = parent.clientHeight;
+  if (currentState) renderTracker(currentState);
+}
+
+function toggleModal(show) {
+  if (show) els.modal.classList.remove('hidden');
+  else els.modal.classList.add('hidden');
+}
+
+// --- API Interaction ---
+async function fetchStars() {
+  try {
+    const res = await fetch(`${API_BASE}/api/nav/stars`);
+    if (!res.ok) throw new Error('Failed to fetch star catalog');
+    starCatalog = await res.json();
+    console.log(`Loaded ${starCatalog.length} stars.`);
+  } catch (e) {
+    console.error("Star Catalog Error:", e);
+    starCatalog = [];
+  }
+}
+
+
+
+async function fetchData() {
+  try {
+    const res = await fetch(`${API_BASE}/api/nav/state/${SC_ID}`);
+    if (!res.ok) throw new Error('API Error');
+    const data = await res.json();
+
+    currentState = data;
+    updateUI(data);
+  } catch (e) {
+    console.error("Fetch failed", e);
+    els.timeDisplay.innerText = "CONN. ERROR";
+  }
+}
+
+/* async function handleBurn() {
+  const dv = {
+    x: parseFloat(els.inputs.x.value) || 0,
+    y: parseFloat(els.inputs.y.value) || 0,
+    z: parseFloat(els.inputs.z.value) || 0,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/cmd/burn/${SC_ID}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        delta_v: dv,
+        utc_time: currentState ? currentState.time.utc : ""
+      })
+    });
+
+    if (res.ok) {
+      showStatus("Engine Burn Executed.", "text-green-500");
+      fetchData();
+    } else {
+      showStatus("Burn Failed.", "text-red-500");
+    }
+  } catch (e) {
+    showStatus("Comm Error.", "text-red-500");
+  }
+} 
+
+function showStatus(msg, colorClass) {
+  els.statusMsg.innerText = msg;
+  // Simple flash
+  setTimeout(() => els.statusMsg.innerText = "", 3000);
+} */
+
+function updateUI(data) {
+  els.fuelDisplay.innerText = data.fuel.toFixed(1);
+  // Time updated by local ticker
+  renderTracker(data);
+}
+
+// Local Clock Ticker (Independent of Fetch)
+setInterval(() => {
+  // Format: YYYY-MM-DD HH:MM:SS UTC
+  const now = new Date();
+  const iso = now.toISOString().replace('T', ' ').substring(0, 19);
+  els.timeDisplay.innerText = iso;
+}, 1000);
+
+// --- Star Tracker Logic ---
+
+// Coordinate transformations
+function deg2rad(d) { return d * Math.PI / 180; }
+function rad2deg(r) { return r * 180 / Math.PI; }
+
+function getRotMatrix(raDeg, decDeg) {
+  const a = deg2rad(raDeg);
+  const d = deg2rad(decDeg);
+
+  const fx = Math.cos(d) * Math.cos(a);
+  const fy = Math.cos(d) * Math.sin(a);
+  const fz = Math.sin(d);
+
+  const ux = -Math.sin(d) * Math.cos(a);
+  const uy = -Math.sin(d) * Math.sin(a);
+  const uz = Math.cos(d);
+
+  const rx = fy * uz - fz * uy;
+  const ry = fz * ux - fx * uz;
+  const rz = fx * uy - fy * ux;
+
+  return [
+    [-rx, -ry, -rz],
+    [ux, uy, uz],
+    [fx, fy, fz]
+  ];
+}
+
+function renderTracker(data) {
+  const ctx = els.canvas.getContext('2d');
+  const w = els.canvas.width;
+  const h = els.canvas.height;
+
+  // Clear
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, w, h);
+
+  // Update Camera Telemetry DOM
+  els.camFov.innerText = `${cam.fov.toFixed(1)}°`;
+  els.camRa.innerText = `${cam.ra.toFixed(2)}°`;
+  els.camDec.innerText = `${cam.dec.toFixed(2)}°`;
+
+  // Camera Setup
+  const rot = getRotMatrix(cam.ra, cam.dec);
+  const scale = (w / 2) / Math.tan(deg2rad(cam.fov) / 2); // Pinhole scale
+
+  function project(objRa, objDec) {
+    const ra = deg2rad(objRa);
+    const dec = deg2rad(objDec);
+    const Px = Math.cos(dec) * Math.cos(ra);
+    const Py = Math.cos(dec) * Math.sin(ra);
+    const Pz = Math.sin(dec);
+
+    const Cx = rot[0][0] * Px + rot[0][1] * Py + rot[0][2] * Pz;
+    const Cy = rot[1][0] * Px + rot[1][1] * Py + rot[1][2] * Pz;
+    const Cz = rot[2][0] * Px + rot[2][1] * Py + rot[2][2] * Pz;
+
+    if (Cz <= 0) return null;
+
+    return {
+      x: (w / 2) + (Cx / Cz) * scale,
+      y: (h / 2) - (Cy / Cz) * scale
+    };
+  }
+
+  // Draw Stars
+  // Optimization: Stars are many (~9000). 
+  // We can pre-calculate colors or do it on fly. 
+  // Given 60fps target, keep it simple first.
+
+  starCatalog.forEach(star => {
+    // Simple cull before projection if possible? 
+    // No, need projection to know if in FOV easily without complex 3D math here.
+    const p = project(star.ra, star.dec);
+    if (p) {
+      if (p.x < -2 || p.x > w + 2 || p.y < -2 || p.y > h + 2) return;
+
+      // Magnitude scaling based on phys.
+      // E.g. area ~ flux ~ 10^(-0.4 * mag)
+      // Visual tweak:
+      let r = 0;
+      let alpha = 1.0;
+
+      if (star.mag < 1.0) {
+        r = 2.5 - (star.mag * 0.5);
+        alpha = 1.0;
+      } else if (star.mag < 3.0) {
+        r = 1.5 - ((star.mag - 1.0) * 0.3);
+        alpha = 0.9;
+      } else {
+        r = 1.0 - ((star.mag - 3.0) * 0.15);
+        alpha = Math.max(0.3, 0.8 - ((star.mag - 3.0) * 0.2));
+      }
+      if (r < 0.6) r = 0.6; // Minimum visible pixel size
+
+      // Color from B-V Index
+      // Rough approximation
+      let fill = '#ffffff';
+      if (typeof star.bv === 'number') {
+        if (star.bv < 0.0) fill = '#9bb0ff';      // Blue-white
+        else if (star.bv < 0.5) fill = '#cad7ff'; // White-blue
+        else if (star.bv < 1.0) fill = '#f8f7ff'; // White
+        else if (star.bv < 1.5) fill = '#fff4ea'; // Yellowish
+        else if (star.bv < 2.0) fill = '#ffd2a1'; // Orange
+        else fill = '#ffcc6f';                    // Red
+      }
+
+      ctx.fillStyle = fill;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  });
+  ctx.globalAlpha = 1.0;
+
+  // Draw Planets
+  data.observables.bodies.forEach(body => {
+    const p = project(body.ra, body.dec);
+    if (p) {
+      const color = PLANET_COLORS[body.name.toUpperCase()] || 'cyan';
+      const isSun = body.name === 'SUN';
+
+      ctx.fillStyle = color;
+      const r = isSun ? 10 : 5;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '10px monospace';
+      ctx.fillText(body.name, p.x + r + 4, p.y + 3);
+    }
+  });
+
+  // Draw Crosshairs
+  ctx.strokeStyle = '#22c55e'; // green-500
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 20, h / 2);
+  ctx.lineTo(w / 2 + 20, h / 2);
+  ctx.moveTo(w / 2, h / 2 - 20);
+  ctx.lineTo(w / 2, h / 2 + 20);
+  ctx.stroke();
+}
+
+function handleCanvasWheel(e) {
+  e.preventDefault();
+  let newFov = cam.fov + (e.deltaY * 0.05);
+  if (newFov < 1) newFov = 1;
+  if (newFov > 120) newFov = 120;
+
+  cam.fov = newFov;
+  if (currentState) renderTracker(currentState);
+}
+
+function handleCanvasMouseMove(e) {
+  if (cam.dragging) {
+    const dx = e.clientX - cam.lastX;
+    const dy = e.clientY - cam.lastY;
+    const degPerPx = cam.fov / els.canvas.height;
+
+    cam.ra += -dx * degPerPx;
+    cam.dec += dy * degPerPx;
+
+    if (cam.ra < 0) cam.ra += 360;
+    if (cam.ra >= 360) cam.ra -= 360;
+    if (cam.dec > 90) cam.dec = 90;
+    if (cam.dec < -90) cam.dec = -90;
+
+    cam.lastX = e.clientX;
+    cam.lastY = e.clientY;
+
+    if (currentState) renderTracker(currentState);
+  }
+}
+
+// Boot
+window.onload = init;
+
+function switchTab(tabId) {
+  // Hide all contents
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  // Deactivate buttons
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+  // Activate target
+  document.getElementById(tabId).classList.remove('hidden');
+  document.getElementById(tabId).classList.add('active');
+  document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+
+  // Resize canvas if needed when becoming visible
+  if (tabId === 'tab-tracker') resizeCanvas();
+}

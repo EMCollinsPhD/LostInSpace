@@ -1,0 +1,265 @@
+/* Global Reset */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #0f172a;
+    /* slate-900 */
+    color: #e2e8f0;
+    /* slate-200 */
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Utilities */
+.text-green-500 {
+    color: #22c55e;
+}
+
+.text-cyan-500 {
+    color: #06b6d4;
+}
+
+.text-red-500 {
+    color: #ef4444;
+}
+
+.text-white {
+    color: #ffffff;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 1.5rem;
+    gap: 1.5rem;
+}
+
+/* Header */
+/* Header Updates */
+header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tab-nav {
+    display: flex;
+    gap: 2px;
+    background-color: #1e293b;
+    padding: 2px;
+    border-radius: 0.25rem;
+}
+
+.tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    border-radius: 0.25rem;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    background-color: #334155;
+    color: white;
+}
+
+.tab-btn.active {
+    background-color: #22c55e;
+    /* green-500 */
+    color: #0f172a;
+    /* slate-900 */
+}
+
+/* Tabs */
+.tab-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    border: 2px dashed #334155;
+    border-radius: 0.5rem;
+    color: #64748b;
+}
+
+/* Main Grid Removed */
+
+/* Main Grid (Legacy replacement) */
+main {
+    flex: 1;
+    overflow: hidden;
+    /* Prevent full page scroll if contents scroll */
+    display: block;
+    /* Removed grid, now handled by tab content */
+}
+
+/* Canvas Panel */
+.tracker-panel {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+
+
+.canvas-container {
+    flex: 1;
+    position: relative;
+    border: 2px solid #334155;
+    border-radius: 0.5rem;
+    background-color: black;
+    overflow: hidden;
+    /* min-height removed */
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+}
+
+#tracker-overlay {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    background-color: #1e293b;
+    color: #4ade80;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid #22c55e;
+    font-size: 0.75rem;
+    display: none;
+    /* Hidden unless active */
+}
+
+/* Telemetry Overlay */
+.telemetry-overlay {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background-color: rgba(15, 23, 42, 0.8);
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid #334155;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.telemetry-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.telemetry-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 42rem;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+    padding: 1rem;
+    background-color: #0f172a;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+    color: #4ade80;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    color: #cbd5e1;
+}
+
+.modal-body h3 {
+    color: white;
+    font-size: 1.125rem;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.modal-body h3:first-child {
+    margin-top: 0;
+}
+
+.modal-body ul {
+    background-color: #0f172a;
+    padding: 0.75rem 0.75rem 0.75rem 2rem;
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.modal-footer {
+    padding: 1rem;
+    background-color: #0f172a;
+    border-top: 1px solid #334155;
+    display: flex;
+    justify-content: flex-end;
+}
