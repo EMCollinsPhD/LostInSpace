@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from .engine import (
     load_kernels, utc_to_et, et_to_utc, get_apparent_target_radec, vector_to_radec,
-    get_body_position, get_orbit_path
+    get_body_position, get_orbit_path, frame_transform
 )
 from .sim import get_sim, Spacecraft
 from .models import StateVector, Vector3, BurnCommand, StarData
@@ -60,14 +60,19 @@ async def get_orrery_live():
     """Return current positions of solar system bodies."""
     # Use current sim time (or real time if sim not persistent)
     # Ideally should use sim time.
+    # Use current sim time from any active spacecraft
     sim = get_sim()
-    # We can use the first spacecraft's time as the "Sim Time"
-    # or just use real time for the Overview if it's meant to be "Now".
-    # Let's use 'emc2' or 'student1' time if available, else real time.
+    et = None
     
-    # For now, just grab student1 time
-    sc = sim.get_spacecraft("student1")
-    et = sc.et if sc else utc_to_et("2026-01-01T00:00:00")
+    # Try to find any spacecraft to use as time reference
+    if sim.spacecrafts:
+        # Just grab the first one
+        first_sc = next(iter(sim.spacecrafts.values()))
+        et = first_sc.et
+        
+    if et is None:
+        # Fallback if no spacecraft loaded
+        et = utc_to_et("2026-01-01T00:00:00")
     
     bodies = ["MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN"]
     data = {}
@@ -84,9 +89,14 @@ async def get_orrery_live():
 async def get_orrery_static():
     """Return orbital paths for solar system bodies (Initial Load)."""
     # Use roughly current time to generate the ellipse
+    # Use roughly current time to generate the ellipse
     sim = get_sim()
-    sc = sim.get_spacecraft("student1")
-    et = sc.et if sc else utc_to_et("2026-01-01T00:00:00")
+    et = None
+    if sim.spacecrafts:
+        first_sc = next(iter(sim.spacecrafts.values()))
+        et = first_sc.et
+    else:
+        et = utc_to_et("2026-01-01T00:00:00")
     
     bodies = ["MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN"]
     paths = {}
@@ -104,10 +114,15 @@ async def get_nav_state(sc_id: str, user_id: str = Depends(get_current_user)):
     but for the UI instrument panel, we might want to return them 'hidden' or 
     just return the observables.
     """
-    if user_id != sc_id:
-        raise HTTPException(status_code=403, detail="Not authorized to view this spacecraft")
+    if user_id == "admin":
+        # Admin View: Use 'arcadia' as the "Observer" platform
+        sc = get_sim().get_spacecraft("arcadia")
+        # And we will inject other spacecraft as visible bodies below
+    else:
+        if user_id != sc_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this spacecraft")
+        sc = get_sim().get_spacecraft(sc_id)
 
-    sc = get_sim().get_spacecraft(sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Spacecraft not found")
     
@@ -117,7 +132,7 @@ async def get_nav_state(sc_id: str, user_id: str = Depends(get_current_user)):
     
     # Calculate visible bodies (Planets + Sun)
     # We treat the spacecraft position as relative to SUN for these calcs
-    bodies = ["SUN", "EARTH", "MARS", "JUPITER", "VENUS"]
+    bodies = ["SUN", "EARTH", "MARS", "JUPITER", "VENUS", "MERCURY", "SATURN"]
     visible_bodies = []
     
     for body in bodies:
@@ -128,6 +143,24 @@ async def get_nav_state(sc_id: str, user_id: str = Depends(get_current_user)):
             "dec": dec,
             "mag": -1.0 # Placeholder
         })
+        
+    if user_id == "admin":
+        sim = get_sim()
+        for other_id, other_sc in sim.spacecrafts.items():
+            if other_id == sc.id: continue # Don't see self (arcadia)
+            
+            # Calculate RA/DEC of other_sc relative to sc (arcadia)
+            # Both are J2000 state. 
+            # Vector from sc to other:
+            rel_pos = other_sc.state[:3] - sc.state[:3]
+            r, ra, dec = vector_to_radec(rel_pos)
+            
+            visible_bodies.append({
+                "name": f"SC: {other_id}",
+                "ra": ra,
+                "dec": dec,
+                "mag": 2.0 # Make them visible
+            })
         
     # Calculate stars (treated as infinite distance, so RA/DEC is constant J2000 catalog value?)
     # Proper motion is negligible for this. Parallax negligible.
@@ -166,8 +199,11 @@ async def execute_burn(sc_id: str, command: BurnCommand, user_id: str = Depends(
     return {"status": "Burn executed", "remaining_fuel": sc.fuel}
 
 @app.get("/api/admin/truth/{sc_id}")
-async def get_truth_state(sc_id: str):
+async def get_truth_state(sc_id: str, user_id: str = Depends(get_current_user)):
     """Debug endpoint to see actual state."""
+    if user_id != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
     sc = get_sim().get_spacecraft(sc_id)
     if not sc:
         raise HTTPException(status_code=404, detail="Spacecraft not found")
@@ -178,3 +214,20 @@ async def get_truth_state(sc_id: str):
         "et": sc.et,
         "utc": et_to_utc(sc.et)
     }
+
+@app.get("/api/admin/fleet")
+async def get_fleet_state(user_id: str = Depends(get_current_user)):
+    """Return all spacecraft states for Orrery (Admin Only)."""
+    if user_id != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    sim = get_sim()
+    fleet = {}
+    for sc_id, sc in sim.spacecrafts.items():
+        # Transform J2000 state to ECLIPJ2000 for Orrery visualization
+        # Orrery planets are in Ecliptic frame.
+        pos_j2000 = sc.state[:3]
+        state_eclip = frame_transform(sc.state, "J2000", "ECLIPJ2000", sc.et)
+        fleet[sc_id] = list(state_eclip[:3])
+        
+    return fleet

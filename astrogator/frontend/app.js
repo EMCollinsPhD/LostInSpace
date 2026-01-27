@@ -1,4 +1,4 @@
-import { API_BASE } from './config.js';
+import { API_BASE, VERSION } from './config.js';
 import { initOrrery, triggerResize } from './orrery.js';
 // const SC_ID = 'student1'; // Removed: Dynamic based on login
 
@@ -41,8 +41,9 @@ const PLANET_COLORS = {
 const els = {
   canvas: document.getElementById('star-tracker'),
   overlay: document.getElementById('tracker-overlay'),
-  timeDisplay: document.getElementById('display-time'),
-  fuelDisplay: document.getElementById('display-fuel'),
+  utcDisplay: document.getElementById('display-utc'),
+  jdDisplay: document.getElementById('display-jd'),
+  // fuelDisplay: document.getElementById('display-fuel'),
   camFov: document.getElementById('display-fov'),
   camRa: document.getElementById('display-ra'),
   camDec: document.getElementById('display-dec'),
@@ -109,7 +110,7 @@ function startApp() {
   document.getElementById('login-modal').style.display = 'none';
 
   // Update header
-  document.querySelector('.version').innerText = `v0.2.1 [${auth.id}]`;
+  document.querySelector('.version').innerText = `${VERSION} [${auth.id}]`;
 
   fetchStars().then(() => {
     fetchData();
@@ -206,7 +207,8 @@ async function fetchData() {
     updateUI(data);
   } catch (e) {
     console.error("Fetch failed", e);
-    els.timeDisplay.innerText = "CONN. ERROR";
+    els.utcDisplay.innerText = "CONN. ERROR";
+    els.jdDisplay.innerText = "CONN. ERROR";
   }
 }
 
@@ -257,7 +259,8 @@ function showStatus(msg, colorClass) {
 } */
 
 function updateUI(data) {
-  els.fuelDisplay.innerText = data.fuel.toFixed(1);
+  // Temporarily disabled
+  // els.fuelDisplay.innerText = data.fuel.toFixed(1);
   // Time updated by local ticker
   renderTracker(data);
 }
@@ -267,7 +270,8 @@ setInterval(() => {
   // Format: YYYY-MM-DD HH:MM:SS UTC
   const now = new Date();
   const iso = now.toISOString().replace('T', ' ').substring(0, 19);
-  els.timeDisplay.innerText = iso;
+  els.utcDisplay.innerText = iso;
+  els.jdDisplay.innerText = now.getTime() / 86400000 + 2440587.5;
 }, 1000);
 
 // --- Star Tracker Logic ---
@@ -353,7 +357,7 @@ function renderTracker(data) {
 
       if (dist < 15 && dist < closestDist) {
         closestDist = dist;
-        closestName = "STAR " + (star.id || "");
+        closestName = (star.name || "Unknown Star");
       }
 
       // Magnitude scaling based on phys.
@@ -392,19 +396,38 @@ function renderTracker(data) {
   });
   ctx.globalAlpha = 1.0;
 
-  // Draw Planets
+  // Update Target Display logic above handles closestName.
+
+  // Draw Planets & Spacecraft
   data.observables.bodies.forEach(body => {
     const p = project(body.ra, body.dec);
     if (p) {
-      const color = PLANET_COLORS[body.name.toUpperCase()] || 'cyan';
-      const isSun = body.name === 'SUN';
+      // Different logic for Spacecraft vs Planets
+      if (body.name.startsWith("SC:")) {
+        // Spacecraft Target
+        ctx.strokeStyle = '#00ff00'; // Green
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Draw a hollow square centered on p (radius ~8px)
+        const r = 5;
+        ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
+        ctx.stroke();
 
-      ctx.fillStyle = color;
-      const r = isSun ? 10 : 5;
+        // Optional: Label?
+        // ctx.fillStyle = '#00ff00';
+        // ctx.fillText(body.name.substring(4), p.x + 10, p.y + 4);
+      } else {
+        // Planet / Sun
+        const color = PLANET_COLORS[body.name.toUpperCase()] || 'cyan';
+        const isSun = body.name === 'SUN';
 
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
-      ctx.fill();
+        ctx.fillStyle = color;
+        const r = isSun ? 10 : 5;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+        ctx.fill();
+      }
 
       // Targeting Logic
       const dx = p.x - (w / 2);
@@ -419,7 +442,6 @@ function renderTracker(data) {
     }
   });
 
-  // Update Target Display
   if (els.camTarget) {
     els.camTarget.innerText = closestName;
     els.camTarget.className = (closestName !== "--") ? "text-cyan-500 font-bold" : "text-slate-500";

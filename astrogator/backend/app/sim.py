@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from datetime import datetime, timezone
 from typing import Dict
 from .engine import get_body_state, load_kernels, utc_to_et
@@ -53,18 +54,78 @@ class Simulation:
             print(f"Time Init Error: {e}")
             start_et = 0.0
 
-        # Mock initial state (Heliocentric) near Earth
-        # Earth is ~1AU x.
-        self.spacecrafts["student1"] = Spacecraft(
-            "student1", 
-            np.array([1.496e8, 1000.0, 0.0, 0.0, 29.78, 0.0]), 
-            start_et
-        )
-        self.spacecrafts["emc2"] = Spacecraft(
-            "emc2", 
-            np.array([1.496e8 + 5000, 1000.0 + 5000, 0.0, 0.0, 29.78, 0.0]), 
-            start_et
-        )
+        # Initialize at L1 (Earth-Sun)
+        # Load kernel wrapper to ensure we can get Earth state
+        # (Kernels are loaded in lifespan, but Sim might be instantiated before? 
+        # Actually 'get_sim' is called in endpoints, so kernels should be loaded.)
+        
+        # Get Earth State relative to Sun
+        try:
+            earth_state = get_body_state("EARTH", "SUN", start_et, "J2000")
+            # earth_state is [x, y, z, vx, vy, vz]
+            r_earth = earth_state[:3]
+            v_earth = earth_state[3:6]
+            
+            # L1 Approximation: ~1% sunward (1.5 million km)
+            # Exact: R_L1 = R_E * (1 - (Me/3Ms)^(1/3))
+            # Me/Ms ~= 3e-6. Cbrt(1e-6) = 0.01. So 0.99 is good.
+            l1_scale = 0.99
+            
+            base_pos = r_earth * l1_scale
+            base_vel = v_earth * l1_scale # Match angular velocity for stationary relative pos
+            
+        except Exception as e:
+            print(f"Error calculating L1: {e}")
+            # Fallback
+            base_pos = np.array([1.48e8, 0, 0])
+            base_vel = np.array([0, 29.5, 0])
+
+        # Load Users
+        users_file = os.path.join(os.path.dirname(__file__), "../data/users.json")
+        import json
+        with open(users_file) as f:
+            users = json.load(f)
+
+        import random
+        # Create spacecraft for each user
+        for sc_id in users.keys():
+            if sc_id == "admin":
+                continue
+                
+            # Add random perturbation (box of +/- 2000km)
+            # This is a "Halo" distribution roughly
+            dx = random.uniform(-2000, 2000)
+            dy = random.uniform(-2000, 2000)
+            dz = random.uniform(-2000, 2000)
+            
+            # Velocity perturbation (drift) - very small
+            dvx = random.uniform(-0.01, 0.01) # 10 m/s
+            dvy = random.uniform(-0.01, 0.01)
+            dvz = random.uniform(-0.01, 0.01)
+            
+            pos = base_pos + np.array([dx, dy, dz])
+            vel = base_vel + np.array([dvx, dvy, dvz])
+            
+            # Convert back to J2000 if needed? 
+            # get_body_state returned ECLIPJ2000. 
+            # Our sim assumes J2000 usually? 
+            # Spacecraft.__init__ comment says "Heliocentric J2000".
+            # IF get_body_state returned ECLIP, we need to rotate it?
+            # actually our get_body_state wrapper takes a frame arg.
+            # Let's check get_body_state usage above.
+            
+            # Let's ensure we use J2000 for internal state to be consistent with everything else.
+            # But L1 is easier to visualize in Ecliptic. 
+            # Let's do the math in J2000 directly. 
+            # If we requested ECLIPJ2000 above, the physics is valid in that frame too.
+            # BUT if we store it as state, and then `main.py` treats it as J2000...
+            # We should probably request J2000 from the start to avoid confusion.
+            
+            self.spacecrafts[sc_id] = Spacecraft(
+                sc_id,
+                np.hstack((pos, vel)),
+                start_et
+            )
 
     def get_spacecraft(self, sc_id: str) -> Spacecraft:
         # Auto-update to current time on access?
