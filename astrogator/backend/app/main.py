@@ -20,14 +20,20 @@ async def lifespan(app: FastAPI):
     yield
     # Clean up if needed
 
-app = FastAPI(title="Astrogator API", version="0.2.3", lifespan=lifespan)
+app = FastAPI(title="Astrogator API", version="0.2.5", lifespan=lifespan)
 
 # CORS Configuration
+# Environment-aware CORS configuration
+# Always allow localhost for development
 origins = [
-    "http://localhost:5173",    # Vite default
-    "http://127.0.0.1:5173",    # For local dev testing
-    "http://173.235.214.113:5173" # Static IP when deployed
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
+
+# Add production origin from environment variable
+prod_origin = os.getenv("ALLOWED_ORIGIN")
+if prod_origin:
+    origins.append(prod_origin)
 
 app.add_middleware(
     CORSMiddleware,

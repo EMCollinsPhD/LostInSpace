@@ -1,0 +1,32 @@
+services:
+  backend:
+    build: ./backend
+    container_name: astrogator_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount kernels from host so we don't build them into image
+      - ./backend/kernels:/app/kernels
+      # Persist data (users.json etc)
+      - ./backend/data:/app/data
+    environment:
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
+      
+  caddy:
+    image: caddy:latest
+    container_name: astrogator_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:
