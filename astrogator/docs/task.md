@@ -1,0 +1,101 @@
+# Tasks
+
+- [x] Improve Starfield Realism <!-- id: 0 -->
+    - [x] Investigate current star catalog usage <!-- id: 1 -->
+    - [x] Research/Acquire better star catalog (e.g., BSC, Tycho-2 subset) <!-- id: 2 -->
+    - [x] Implement robust star catalog loader in backend <!-- id: 3 -->
+    - [x] Update frontend to render stars with higher fidelity (magnitude, color) <!-- id: 4 -->
+- [x] Release v0.2.0 <!-- id: 5 -->
+    - [x] Update version in index.html <!-- id: 6 -->
+    - [x] Update version in backend/app/main.py <!-- id: 7 -->
+    - [x] Git commit "v0.2.0" <!-- id: 8 -->
+- [x] Debug SPICE Initialization <!-- id: 9 -->
+    - [x] Verify existence of LSK (Leap Seconds Kernel) <!-- id: 10 -->
+    - [x] Check `sim.py` for premature SPICE calls <!-- id: 11 -->
+    - [x] Fix initialization order or kernel loading <!-- id: 12 -->
+- [x] Optimize Star Catalog Delivery <!-- id: 13 -->
+    - [x] Create `/api/nav/stars` endpoint in backend <!-- id: 14 -->
+    - [x] Remove star data from `/api/nav/state` endpoint <!-- id: 15 -->
+    - [x] Update frontend to fetch stars only once at startup <!-- id: 16 -->
+    - [x] Update rendering logic to use cached star data <!-- id: 17 -->
+- [x] Release v0.2.1 <!-- id: 18 -->
+    - [x] Update version in index.html <!-- id: 19 -->
+    - [x] Update version in backend/app/main.py <!-- id: 20 -->
+    - [x] Git commit "v0.2.1" <!-- id: 21 -->
+- [x] Implement Multi-User Authentication <!-- id: 22 -->
+    - [x] Create `auth.py` for token verification <!-- id: 23 -->
+    - [x] Secure `/api/nav/state/{sc_id}` endpoint <!-- id: 24 -->
+    - [x] Secure `/api/cmd/burn/{sc_id}` endpoint <!-- id: 25 -->
+    - [x] Implement Login UI in frontend <!-- id: 26 -->
+    - [x] Update frontend API calls to include Auth header <!-- id: 27 -->
+- [x] Refine UI and Add Test Account <!-- id: 28 -->
+    - [x] Add `emc2` to users.json and sim.py <!-- id: 29 -->
+    - [x] Change Help/Refresh to icon-only buttons <!-- id: 30 -->
+    - [x] Add Icon-only Logout button <!-- id: 31 -->
+    - [x] Wire up Logout button in app.js <!-- id: 32 -->
+    - [x] Refine Login Modal Styling <!-- id: 33 -->
+- [x] Release v0.2.2 <!-- id: 34 -->
+    - [x] Update version in index.html, main.py <!-- id: 35 -->
+    - [x] Git commit "v0.2.2" <!-- id: 36 -->
+- [x] Codebase Cleanup <!-- id: 43 -->
+    - [x] Delete legacy `frontend` (React) <!-- id: 44 -->
+    - [x] Move `vanilla` to `frontend` <!-- id: 45 -->
+    - [x] Move `vanilla` to `frontend` <!-- id: 45 -->
+- [ ] Implement 3D Orrery Display <!-- id: 37 -->
+    - [x] Add Three.js dependencies <!-- id: 38 -->
+    - [x] Create `orrery.js` module <!-- id: 39 -->
+    - [x] Integrate Orrery into Overview Tab <!-- id: 40 -->
+    - [x] Add OrbitControls and basic Sun/Planet meshes <!-- id: 41 -->
+    - [x] Create Backend API `/api/nav/orrery` <!-- id: 46 -->
+    - [x] Render Planets and Orbits in `orrery.js` <!-- id: 47 -->
+    - [x] Verify rendering and controls <!-- id: 42 -->
+- [x] Refactor Configuration (`config.js`) <!-- id: 48 -->
+- [x] Debug Orrery Data (Mars/Jupiter/Saturn zeros) <!-- id: 49 -->
+- [x] Align Orrery to Ecliptic Plane <!-- id: 50 -->
+- [x] Refine Star Tracker and Orrery <!-- id: 51 -->
+    - [x] Fix Missing Planets (Mercury/Saturn) in Nav State <!-- id: 52 -->
+    - [x] Fix Star Tracker Targeting (ID vs Name) <!-- id: 53 -->
+    - [x] Verify Orrery Scaling and Alignment <!-- id: 54 -->
+- [ ] Release v0.2.3 <!-- id: 55 -->
+    - [x] Update version in index.html to v0.2.3 <!-- id: 56 -->
+    - [x] Update version in main.py to v0.2.3 <!-- id: 57 -->
+    - [ ] Git commit "v0.2.3" <!-- id: 58 -->
+- [x] Add Favicon <!-- id: 59 -->
+- [x] Initialize L1 Flotilla <!-- id: 60 -->
+    - [x] Update users.json with 15 cargo ships <!-- id: 61 -->
+    - [x] Implement L1 positioning logic in sim.py <!-- id: 62 -->
+    - [x] Verify positions (Alignment=1.0, Dist~1.47M km) <!-- id: 63 -->
+- [x] Refactor for Admin & Rename User <!-- id: 64 -->
+    - [x] Rename `emc2` to `noctis` and add `admin` in users.json (Random Tokens) <!-- id: 65 -->
+    - [x] Exclude `admin` from sim.py initialization <!-- id: 66 -->
+    - [x] Implement Admin Star Tracker Logic (View from `arcadia`) <!-- id: 67 -->
+    - [x] Secure `truth` endpoint and add `/api/admin/fleet` <!-- id: 68 -->
+    - [x] Visualize Fleet in Orrery (Frontend) <!-- id: 69 -->
+- [x] Refine Access Tokens (3 random 5-letter words) <!-- id: 70 -->
+- [x] Refine Visualizations <!-- id: 71 -->
+    - [x] Star Tracker: Use distinct symbol for SC targets <!-- id: 72 -->
+    - [x] Orrery: Increase scale of fleet meshes <!-- id: 73 -->
+    - [x] Refine Orrery: Use THREE.Points (Constant Screen Size) <!-- id: 74 -->
+- [x] Fix Orrery Coordinates & Zoom <!-- id: 75 -->
+    - [x] Backend: Convert fleet to ECLIPJ2000 <!-- id: 76 -->
+    - [x] Backend: Convert fleet to ECLIPJ2000 <!-- id: 76 -->
+    - [x] Frontend: Fix Camera Near Plane & Zoom Limits <!-- id: 77 -->
+- [x] Fix Orrery Time Reference <!-- id: 78 -->
+- [x] Refine Planet/Sun Visibility (Halo Sprites) <!-- id: 79 -->
+- [x] Fix Planet Sizing (Remove artificial clamp) <!-- id: 80 -->
+- [x] Release v0.2.4 <!-- id: 81 -->
+
+# Deployment Preparation
+- [x] Configure Environment-Aware CORS <!-- id: 82 -->
+- [x] Containerize Backend (`Dockerfile`) <!-- id: 83 -->
+- [x] Setup Reverse Proxy (`Caddyfile`) <!-- id: 84 -->
+- [x] Create Deployment Guide (`DEPLOY.md`) <!-- id: 85 -->
+- [x] Repository Cleanup & .gitignore <!-- id: 86 -->
+- [x] Finalize Deployment Docs <!-- id: 87 -->
+
+# Test Deployment (physbrain.dev)
+- [x] Configure Caddy for `api.physbrain.dev` <!-- id: 88 -->
+- [x] Update Deployment Guide with DNS Instructions <!-- id: 89 -->
+- [x] Release v0.2.5 <!-- id: 91 -->
+- [x] Purge Large Files (Fix Push Error) <!-- id: 92 -->
+- [ ] Sync Docs to Repo (Context Transfer) <!-- id: 93 -->
