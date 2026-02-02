@@ -98,10 +98,19 @@ void Simulation::init(const std::string &data_dir) {
 
     // Add random jitter
     std::vector<double> s = base_pos;
-    s.insert(s.end(), base_vel.begin(), base_vel.end());
 
-    // Simple jitter (pseudo-random)
-    // In C++ we'd use <random>, keeping it simple here
+    // Pseudo-random jitter (roughly +/- 10000 km)
+    // Using string hash of key to be deterministic but different per user
+    size_t seed = std::hash<std::string>{}(key);
+    double jx = (seed % 20000) - 10000.0;
+    double jy = ((seed / 20000) % 20000) - 10000.0;
+    double jz = ((seed / 40000) % 20000) - 10000.0;
+
+    s[0] += jx;
+    s[1] += jy;
+    s[2] += jz;
+
+    s.insert(s.end(), base_vel.begin(), base_vel.end());
 
     spacecrafts[key] =
         Spacecraft(key, s, 0.0); // 0.0 ET will be updated on first tick

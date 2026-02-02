@@ -19,32 +19,40 @@ CSPICE_LIB_DIR="${PROJECT_ROOT}/lib/cspice/lib"
 OUTPUT_LIB="${CSPICE_LIB_DIR}/cspice.a"
 
 # 2. Build CSPICE
-echo "[1/2] Rebuilding CSPICE library for HOST..."
-# Always rebuild if we suspect it might be ARM
-# Or just force it.
-# Let's just do it.
+# 2. Build CSPICE
+FORCE_REBUILD=0
+if [ "$1" == "--force" ]; then
+    FORCE_REBUILD=1
+fi
 
-# Create a build directory
-BUILD_DIR="${PROJECT_ROOT}/build_cspice_host"
-rm -rf ${BUILD_DIR}
-mkdir -p ${BUILD_DIR}
+if [ -f "${OUTPUT_LIB}" ] && [ $FORCE_REBUILD -eq 0 ]; then
+    echo "[1/2] CSPICE library found at ${OUTPUT_LIB}. Skipping rebuild."
+    echo "      Use --force to rebuild (e.g., ./build_local.sh --force)"
+else
+    echo "[1/2] Rebuilding CSPICE library for HOST..."
+    
+    # Create a build directory
+    BUILD_DIR="${PROJECT_ROOT}/build_cspice_host"
+    rm -rf ${BUILD_DIR}
+    mkdir -p ${BUILD_DIR}
 
-cd ${BUILD_DIR}
+    cd ${BUILD_DIR}
 
-# Host GCC
-CC=gcc
-CFLAGS="-c -O2 -fPIC -w -I${CSPICE_INC}"
+    # Host GCC
+    CC=gcc
+    CFLAGS="-c -O2 -fPIC -w -I${CSPICE_INC}"
 
-echo "Compiling CSPICE sources..."
-find ${CSPICE_SRC} -name "*.c" -print0 | xargs -0 -P $(nproc) -n 20 ${CC} ${CFLAGS}
+    echo "Compiling CSPICE sources..."
+    find ${CSPICE_SRC} -name "*.c" -print0 | xargs -0 -P $(nproc) -n 20 ${CC} ${CFLAGS}
 
-echo "Archiving cspice.a..."
-ar cr cspice.a *.o
-mv cspice.a ${OUTPUT_LIB}
+    echo "Archiving cspice.a..."
+    ar cr cspice.a *.o
+    mv cspice.a ${OUTPUT_LIB}
 
-cd ${PROJECT_ROOT}
-rm -rf ${BUILD_DIR}
-echo "CSPICE built successfully (x86_64)."
+    cd ${PROJECT_ROOT}
+    rm -rf ${BUILD_DIR}
+    echo "CSPICE built successfully (x86_64)."
+fi
 
 # 3. Build Backend
 echo "[2/2] Building Astrogator Backend (Local)..."

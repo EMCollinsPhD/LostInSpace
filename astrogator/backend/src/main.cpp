@@ -196,22 +196,52 @@ int main(int argc, char **argv) {
     // For C++ MVP, let's just send back minimal data so frontend doesn't crash?
     // Frontend expects: observables: { bodies: [ {name, ra, dec, mag} ] }
 
+    Spacecraft *observer_sc = sim->get_spacecraft(id);
+    if (!observer_sc) {
+      res.status = 404;
+      return;
+    }
+
     std::vector<std::string> targets = {
         "SUN",     "MERCURY", "VENUS",  "EARTH",   "MARS",
         "JUPITER", "SATURN",  "URANUS", "NEPTUNE", "PLUTO"};
+
+    // Add all peer spacecrafts to targets (for everyone)
+    for (auto const &[key, val] : sim->spacecrafts) {
+      if (key == id)
+        continue;
+      targets.push_back(key);
+    }
+
     json bodies_list = json::array();
 
     for (const auto &t : targets) {
       std::string target_name = t;
 
       // Calculate Apparent RA/DEC
-      // Observer State: sc->state is J2000 relative to SUN (assuming Sim logic)
-      // Actually Sim stores state relative to SUN?
-      // sim.cpp init state uses get_body_position(..., "SUN", ...). So yes.
-      std::vector<double> obs_pos = {sc->state[0], sc->state[1], sc->state[2]};
+      // Observer State
+      std::vector<double> obs_pos = {
+          observer_sc->state[0], observer_sc->state[1], observer_sc->state[2]};
 
-      std::vector<double> radec =
-          engine::get_apparent_target_radec(t, obs_pos, sc->et);
+      // Target Position Logic
+      // If target is a spacecraft, use its state. Else use SPICE.
+      std::vector<double> radec;
+      Spacecraft *target_sc = sim->get_spacecraft(t);
+
+      if (target_sc) {
+        // It's a ship
+        std::vector<double> target_pos = {
+            target_sc->state[0], target_sc->state[1], target_sc->state[2]};
+        // Vector from Obs to Target
+        double dx = target_pos[0] - obs_pos[0];
+        double dy = target_pos[1] - obs_pos[1];
+        double dz = target_pos[2] - obs_pos[2];
+        std::vector<double> rel_pos = {dx, dy, dz};
+        radec = engine::vector_to_radec(rel_pos);
+      } else {
+        // It's a planet
+        radec = engine::get_apparent_target_radec(t, obs_pos, observer_sc->et);
+      }
 
       bodies_list.push_back({{"name", target_name},
                              {"ra", radec[1]},
@@ -261,7 +291,34 @@ int main(int argc, char **argv) {
 
     } catch (...) {
       res.status = 400;
+      return;
     }
+  });
+
+  // ADMIN FLEET
+  svr.Get("/api/admin/fleet", [sim](const Request &req, Response &res) {
+    enable_cors(res);
+
+    // AUTH CHECK
+    std::string auth = req.get_header_value("Authorization");
+    std::string token = "";
+    if (auth.length() > 7 && auth.substr(0, 7) == "Bearer ") {
+      token = auth.substr(7);
+    }
+
+    // Verify it is ADMIN
+    if (!sim->validate_token("admin", token)) {
+      res.status = 401; // Or 403
+      return;
+    }
+
+    json j;
+    for (auto const &[key, sc] : sim->spacecrafts) {
+      if (key == "admin")
+        continue;
+      j[key] = {sc.state[0], sc.state[1], sc.state[2]};
+    }
+    res.set_content(j.dump(), "application/json");
   });
 
   std::cout << "Server listening on 0.0.0.0:8000" << std::endl;

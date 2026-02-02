@@ -175,15 +175,27 @@ function updateFleet(fleet) {
   if (!scene) return;
 
   const positions = [];
+  let sumX = 0, sumY = 0, sumZ = 0;
+  let count = 0;
 
   Object.values(fleet).forEach(pos => {
-    // Coordinate Mapping: X -> X, Z -> Y, Y -> -Z (Standard Orrery mapping here)
-    positions.push(
-      pos[0] * ORBIT_SCALE,
-      pos[2] * ORBIT_SCALE,
-      -pos[1] * ORBIT_SCALE
-    );
+    // Coordinate Mapping: X -> X, Z -> Y, Y -> -Z
+    const x = pos[0] * ORBIT_SCALE;
+    const y = pos[2] * ORBIT_SCALE;
+    const z = -pos[1] * ORBIT_SCALE;
+    positions.push(x, y, z);
+
+    sumX += x;
+    sumY += y;
+    sumZ += z;
+    count++;
   });
+
+  // Center Camera on Flotilla Centroid
+  if (count > 0 && controls) {
+    controls.target.set(sumX / count, sumY / count, sumZ / count);
+    controls.update();
+  }
 
   const float32 = new Float32Array(positions);
 
