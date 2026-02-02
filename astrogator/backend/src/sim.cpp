@@ -79,15 +79,26 @@ void Simulation::init(const std::string &data_dir) {
 
   // Try to get real Earth state
   try {
-    double et_now = engine::utc_to_et("2026-01-01T00:00:00"); // Start epoch
-    std::vector<double> earth =
-        engine::get_body_position("EARTH", "SUN", et_now, "J2000");
-    // Simplified Logic: Just place them near Earth for now to ensure visibility
-    base_pos = earth;
-    // Scale slightly sunward (0.99)
-    base_pos[0] *= 0.99;
-    base_pos[1] *= 0.99;
-    base_pos[2] *= 0.99;
+    // Correct Initialization Time: Near "Now" (Feb 2 2026) to avoid 30-day lag
+    double et_now = engine::utc_to_et("2026-02-02T12:00:00");
+
+    // Get full state (Pos+Vel) relative to SUN in ECLIPJ2000 (align with
+    // Ecliptic)
+    std::vector<double> earth_state =
+        engine::get_body_state("EARTH", "SUN", et_now, "ECLIPJ2000");
+
+    base_pos = {earth_state[0], earth_state[1], earth_state[2]};
+    base_vel = {earth_state[3], earth_state[4], earth_state[5]};
+
+    // L1 Logic: Scale Position AND Velocity to maintain relative formation
+    double scale = 0.99;
+    base_pos[0] *= scale;
+    base_pos[1] *= scale;
+    base_pos[2] *= scale;
+
+    base_vel[0] *= scale;
+    base_vel[1] *= scale;
+    base_vel[2] *= scale;
   } catch (...) {
   }
 
@@ -112,8 +123,9 @@ void Simulation::init(const std::string &data_dir) {
 
     s.insert(s.end(), base_vel.begin(), base_vel.end());
 
-    spacecrafts[key] =
-        Spacecraft(key, s, 0.0); // 0.0 ET will be updated on first tick
+    // Initialize ET to correct start time
+    double start_et = engine::utc_to_et("2026-02-02T12:00:00");
+    spacecrafts[key] = Spacecraft(key, s, start_et);
   }
 }
 

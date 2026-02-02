@@ -36,7 +36,19 @@ const PLANET_COLORS = {
   'NEPTUNE': '#3b82f6', // blue-500
   'PLUTO': '#94a3b8'  // slate-400
 };
-
+const PLANET_SIZES = {
+  // km radius approx
+  "SUN": 696340,
+  "MERCURY": 2439,
+  "VENUS": 6051,
+  "EARTH": 6371,
+  "MARS": 3389,
+  "JUPITER": 69911,
+  "SATURN": 58232,
+  "URANUS": 25362,
+  "NEPTUNE": 24622,
+  "PLUTO": 1188
+};
 // DOM Elements
 const els = {
   canvas: document.getElementById('star-tracker'),
@@ -401,32 +413,57 @@ function renderTracker(data) {
   // Draw Planets & Spacecraft
   data.observables.bodies.forEach(body => {
     const p = project(body.ra, body.dec);
+    const BODIES = Object.keys(PLANET_COLORS);
     if (p) {
       // Different logic for Spacecraft vs Planets
-      if (body.name.startsWith("SC:")) {
-        // Spacecraft Target
-        ctx.strokeStyle = '#00ff00'; // Green
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        // Draw a hollow square centered on p (radius ~8px)
-        const r = 5;
-        ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
-        ctx.stroke();
-
-        // Optional: Label?
-        // ctx.fillStyle = '#00ff00';
-        // ctx.fillText(body.name.substring(4), p.x + 10, p.y + 4);
-      } else {
+      if (BODIES.includes(body.name)) {
         // Planet / Sun
         const color = PLANET_COLORS[body.name.toUpperCase()] || 'cyan';
         const isSun = body.name === 'SUN';
 
         ctx.fillStyle = color;
-        const r = isSun ? 10 : 5;
+        const scale = isSun ? 0.000015 : 0.000075;
+        const r = scale * PLANET_SIZES[body.name.toUpperCase()];
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
         ctx.fill();
+        // If body is Saturn, draw rings as a thin ellipse
+        if (body.name === 'SATURN') {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, r * 1.5, r * 0.7, 0, 0, 2 * Math.PI);
+          ctx.stroke();
+        }
+      } else {
+        // Spacecraft: Star-like appearance
+        // Bright yellow-white
+        ctx.fillStyle = '#fffee0';
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = '#ffffff';
+
+        // Size inversely proportional to range (if available)
+        // Range is in KM.
+        // Approx scaling: 10,000 km -> 3px radius.
+        const range = body.range || 50000;
+
+        let r = 30000 / (range + 1000);
+        if (r > 6) r = 6;      // Max size limit
+        if (r < 1.5) r = 1.5;  // Min visibility limit
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.shadowBlur = 0; // Reset shadow
+
+        // Label if relatively close?
+        if (range < 100000) {
+          ctx.fillStyle = 'rgba(255, 255, 224, 0.7)';
+          ctx.font = '9px monospace';
+          ctx.fillText(body.name, p.x + 2 * r, p.y + 2 * r);
+        }
       }
 
       // Targeting Logic

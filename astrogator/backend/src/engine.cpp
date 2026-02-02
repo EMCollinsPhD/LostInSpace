@@ -198,4 +198,49 @@ get_orbit_path(const std::string &target, double center_et, int num_points) {
   }
   return points;
 }
+
+std::vector<double> get_body_state(const std::string &target,
+                                   const std::string &observer, double et,
+                                   const std::string &frame) {
+  std::lock_guard<std::mutex> lock(spice_mutex);
+  double state[6];
+  double lt;
+
+  // Handle fallback names if necessary (shared logic with
+  // get_apparent_target_radec) Ideally refactor this lookup, but duplicating
+  // for safety now to avoid unrelated changes
+  std::string target_lookup = target;
+  if (target == "MARS")
+    target_lookup = "4";
+  if (target == "JUPITER")
+    target_lookup = "5";
+  if (target == "SATURN")
+    target_lookup = "6";
+  if (target == "URANUS")
+    target_lookup = "7";
+  if (target == "NEPTUNE")
+    target_lookup = "8";
+  if (target == "PLUTO")
+    target_lookup = "9";
+  if (target == "MERCURY")
+    target_lookup = "1";
+  if (target == "VENUS")
+    target_lookup = "2";
+
+  spkezr_c(target_lookup.c_str(), et, frame.c_str(), "LT+S", observer.c_str(),
+           state, &lt);
+
+  if (failed_c()) {
+    char msg[1024];
+    getmsg_c("LONG", 1024, msg);
+    reset_c();
+    return {0, 0, 0, 0, 0, 0};
+  }
+
+  std::vector<double> ret;
+  for (int i = 0; i < 6; i++) {
+    ret.push_back(state[i]);
+  }
+  return ret;
+}
 } // namespace engine

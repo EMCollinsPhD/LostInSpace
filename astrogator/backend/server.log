@@ -1,0 +1,7 @@
+Initializing SPICE Engine...
+Loaded kernel: kernels/pck00010.tpc
+Loaded kernel: kernels/de440.bsp
+Loaded kernel: kernels/naif0012.tls
+Initializing Simulation...
+Loaded 8404 stars.
+Server listening on 0.0.0.0:8000

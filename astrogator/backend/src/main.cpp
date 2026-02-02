@@ -19,7 +19,7 @@ void enable_cors(Response &res) {
   res.set_header("Access-Control-Allow-Headers", "*");
 }
 
-int main(int argc, char **argv) {
+int main() {
   // 1. Initialize Engine
   std::cout << "Initializing SPICE Engine..." << std::endl;
   engine::load_kernels("kernels"); // Assumes run from backend/ root
@@ -246,6 +246,7 @@ int main(int argc, char **argv) {
       bodies_list.push_back({{"name", target_name},
                              {"ra", radec[1]},
                              {"dec", radec[2]},
+                             {"range", radec[0]},
                              {"mag", -1.0}});
     }
     j["observables"]["bodies"] = bodies_list;

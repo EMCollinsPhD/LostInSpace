@@ -21,9 +21,14 @@ std::vector<std::vector<double>> get_orbit_path(const std::string &target,
 
 // Load all kernels in the data/kernels directory
 void load_kernels(const std::string &kernel_path);
+
 std::vector<double> get_body_position(const std::string &target,
                                       const std::string &observer, double et,
                                       const std::string &frame);
+
+std::vector<double> get_body_state(const std::string &target,
+                                   const std::string &observer, double et,
+                                   const std::string &frame);
 double utc_to_et(const std::string &utc_str);
 std::string et_to_utc(double et);
 } // namespace engine
