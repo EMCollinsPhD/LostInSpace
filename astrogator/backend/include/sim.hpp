@@ -24,8 +24,10 @@ private:
 
 public:
   std::map<std::string, Spacecraft> spacecrafts;
+  std::map<std::string, std::string> api_tokens;
 
   static Simulation *get_instance();
   void init(const std::string &data_dir);
   Spacecraft *get_spacecraft(const std::string &id);
+  bool validate_token(const std::string &id, const std::string &token);
 };

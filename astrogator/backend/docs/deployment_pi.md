@@ -37,12 +37,26 @@ sudo apt-get install g++-arm-linux-gnueabihf
 2.  **Build**:
     ```bash
     cd backend
-    make CXX=arm-linux-gnueabihf-g++ CXXFLAGS="-march=armv6 -mfloat-abi=hard -mfpu=vfp"
-    ```
-    *   *Note*: Ensure you have built the CSPICE library for ARMv6 first, or have a compatible `libcspice.a`. If you cannot compile CSPICE for ARMv6 on your desktop, you may need to compile CSPICE on the Pi itself (slow but reliable) and then copy the static library back to your host, OR just compile the whole project on the Pi (slow).
+    # 1. Compile CSPICE for ARMv6 (Required!)
+    ./tools/cross_compile_cspice.sh
 
-    **Alternative (Native Build on Pi)**:
-    If cross-compilation of CSPICE is too difficult (`toolkit` structure is complex), it might be 10x easier to just compile everything on the Pi since it's C++ (check if 512MB RAM is enough for `g++` on single files).
+    # 2. Build Backend (Static Link for maximum compatibility)
+    make clean
+    make CXX=arm-linux-gnueabihf-g++ CXXFLAGS="-march=armv6 -mfloat-abi=hard -mfpu=vfp -marm -static" LDFLAGS="-static -pthread"
+    ```
+    ```
+    *   *Note*: The `cross_compile_cspice.sh` script rebuilds the CSPICE static library (`lib/cspice/lib/cspice.a`) for ARM architecture.
+    *   *Note*: We use `-static` to avoid issues with mismatched GLIBC versions on older Raspberry Pi OS versions.
+
+    **Option 2: Native Build on Pi (Recommended if you see Segmentation Faults)**
+    Since you have `gcc` installed on the Pi, the most robust method is to just build everything there. This avoids all compatibility issues.
+    1.  Copy the `backend/` folder (along with `lib/`) to the Pi.
+    2.  Run the helper script:
+    ```bash
+    cd backend
+    ./tools/build_native.sh
+    ```
+    3.  This will compile CSPICE (~5 mins) and the Backend (~1 min) using the Pi's own compiler.
     ```bash
     # On Pi
     sudo apt-get install g++ make
@@ -92,5 +106,33 @@ sudo apt-get install g++-arm-linux-gnueabihf
     Enable it:
     ```bash
     sudo systemctl enable astrogator
+    sudo systemctl enable astrogator
     sudo systemctl start astrogator
     ```
+
+## 4. Hosting the Frontend
+
+You can host the frontend directly from the C++ backend (saves RAM!).
+
+1.  **Prepare Frontend**:
+    Since this is a simple static site, **no build is required**.
+    *   (Optional) In `frontend/config.js`, verify `API_BASE = ''`.
+
+2.  **Deploy to Pi**:
+    Copy the **entire contents** of the `frontend/` folder (excluding `node_modules` if any) into a folder named `www/` inside your `backend/` directory on the Pi.
+
+    ```bash
+    # Example structure on Pi:
+    /home/pi/backend/
+    ├── astrogator_backend
+    ├── data/
+    ├── kernels/
+    └── www/          <-- Copy of frontend/ (*.html, *.js, *.css)
+        ├── index.html
+        ├── app.js
+        ├── style.css
+        └── ...
+    ```
+
+3.  **Access**:
+    Open `http://<PI_IP>:8000/`.

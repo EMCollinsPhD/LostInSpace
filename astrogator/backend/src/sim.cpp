@@ -92,8 +92,9 @@ void Simulation::init(const std::string &data_dir) {
   }
 
   for (auto &[key, val] : users.items()) {
-    if (key == "admin")
-      continue;
+    // Store Token
+    // In users.json: "username": "token"
+    api_tokens[key] = val.get<std::string>();
 
     // Add random jitter
     std::vector<double> s = base_pos;
@@ -112,4 +113,11 @@ Spacecraft *Simulation::get_spacecraft(const std::string &id) {
     return &spacecrafts[id];
   }
   return nullptr;
+}
+
+bool Simulation::validate_token(const std::string &id,
+                                const std::string &token) {
+  if (api_tokens.find(id) == api_tokens.end())
+    return false;
+  return api_tokens[id] == token;
 }

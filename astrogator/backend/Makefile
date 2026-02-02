@@ -1,7 +1,7 @@
 # Makefile for Astrogator Backend
 
 CXX ?= g++
-CXXFLAGS += -std=c++17 -O2 -Iinclude -Wall -Wextra
+override CXXFLAGS += -std=c++17 -O2 -Iinclude -Wall -Wextra
 LDFLAGS += -pthread -ldl
 
 # CSPICE Configuration
@@ -13,7 +13,8 @@ CSPICE_INC := $(CSPICE_PATH)/include
 
 # Check if CSPICE exists, if not warn
 ifneq ("$(wildcard $(CSPICE_LIB))","")
-    CXXFLAGS += -I$(CSPICE_INC)
+    $(info Found CSPICE at $(CSPICE_LIB))
+    override CXXFLAGS += -I$(CSPICE_INC)
     LIBS += $(CSPICE_LIB)
 else
     $(warning CSPICE library not found at $(CSPICE_LIB). Build may fail.)
