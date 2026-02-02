@@ -41,3 +41,9 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+# C++ Backend
+backend/obj/
+backend/astrogator_backend
+lib/
+backend_archive/venv/
